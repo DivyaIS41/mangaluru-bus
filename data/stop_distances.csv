@@ -1,0 +1,118 @@
+from_stop,to_stop,distance_km,time_min
+State Bank,Hampankatta,0.3,1.5
+Hampankatta,Lalbagh,0.4,2.0
+Lalbagh,Bejai,0.6,3.0
+Bejai,Kadri,0.5,2.5
+Kadri,Kankanady,0.7,3.5
+State Bank,Balmatta,0.4,2.0
+Balmatta,Jyothi,0.3,1.5
+Jyothi,Kankanady,0.6,3.0
+Kankanady,Pumpwell,0.8,4.0
+Pumpwell,Thokottu,1.2,6.0
+State Bank,Car Street,0.3,1.5
+Car Street,Mannagudda,0.4,2.0
+Mannagudda,Lady Hill,0.3,1.5
+Lady Hill,Chilimbi,0.5,2.5
+Chilimbi,Urwa Store,0.4,2.0
+Urwa Store,Kottara,0.6,3.0
+Kottara,Kulur,0.7,3.5
+Kulur,Kavoor,0.8,4.0
+Kavoor,Kunjathbail,0.6,3.0
+State Bank,Lalbagh,0.5,2.5
+Lalbagh,Kankanady,1.0,5.0
+Kankanady,Bondel,1.5,7.5
+Bondel,Kavoor,1.2,6.0
+Kavoor,Surathkal,1.8,9.0
+Surathkal,Mukka,1.0,4.0
+State Bank,Mangaladevi,0.5,2.5
+Mangaladevi,Attavar,0.4,2.0
+Attavar,Falnir,0.3,1.5
+Falnir,Wenlock Hospital,0.3,1.5
+Wenlock Hospital,KMC Hospital,0.4,2.0
+KMC Hospital,Bunts Hostel,0.3,1.5
+State Bank,Pandeshwar,0.4,2.0
+Pandeshwar,Yemmekere,0.3,1.5
+Yemmekere,Mangaladevi,0.3,1.5
+Mangaladevi,Morgans Gate,0.4,2.0
+Morgans Gate,Jeppu Market,0.3,1.5
+Jeppu Market,Thokottu,1.5,7.5
+State Bank,Jyothi,0.4,2.0
+Jyothi,Pumpwell,0.9,4.5
+Pumpwell,Padil,1.1,5.5
+Padil,Kulshekar,0.8,4.0
+Kulshekar,Vamanjoor,1.0,5.0
+Vamanjoor,Moodushedde,0.9,4.5
+State Bank,Nanthoor,1.2,6.0
+Nanthoor,KPT,0.5,2.5
+KPT,Bejai,0.6,3.0
+Bejai,KSRTC Bus Stand,0.4,2.0
+KSRTC Bus Stand,Lalbagh,0.5,2.5
+Lalbagh,Lady Hill,0.4,2.0
+Lady Hill,Kottara,0.7,3.5
+Kottara,Surathkal,2.2,11.0
+Surathkal,Katipalla,1.0,4.0
+Katipalla,Krishnapura,0.8,3.5
+State Bank,Milagres,0.3,1.5
+Milagres,PVS,0.3,1.5
+PVS,Empire Mall,0.2,1.0
+Empire Mall,Ballalbagh,0.2,1.0
+Ballalbagh,Lalbagh,0.3,1.5
+State Bank,Kudroli,0.4,2.0
+Kudroli,Boloor,0.8,4.0
+Boloor,Sulthan Battery,0.6,3.0
+State Bank,Hoige Bazar,0.5,2.5
+Hoige Bazar,Bolar,0.4,2.0
+Bolar,Jeppu Market,0.4,2.0
+State Bank,Attavar,0.5,2.5
+Attavar,Nanthoor,0.8,4.0
+Nanthoor,Kadri,0.5,2.5
+Kadri,Bikkarnakatta,0.6,3.0
+Bikkarnakatta,Kulshekar,0.5,2.5
+Kulshekar,Kaikamba,0.9,4.5
+Kaikamba,Neermarga,1.0,5.0
+State Bank,Bendoorwell,0.6,3.0
+Bendoorwell,Mallikatte,0.4,2.0
+Mallikatte,Kadri,0.4,2.0
+Kadri,Nanthoor,0.5,2.5
+Nanthoor,Kankanady,0.6,3.0
+State Bank,Falnir,0.4,2.0
+Falnir,Kankanady,0.7,3.5
+State Bank,Light House Hill,0.3,1.5
+Light House Hill,Jyothi,0.3,1.5
+Kankanady,KPT,0.4,2.0
+KPT,Yeyyadi,0.5,2.5
+Yeyyadi,Konchadi,0.6,3.0
+Konchadi,Padavinangadi,0.5,2.5
+Padavinangadi,Bondel,0.6,3.0
+Bondel,Maryhill,0.4,2.0
+Maryhill,Pumpwell,0.8,4.0
+Pumpwell,Nagori,0.6,3.0
+Nagori,Garodi,0.5,2.5
+Garodi,Padil,0.7,3.5
+Padil,Kannurbettu,0.8,4.0
+Kannurbettu,Adyar,0.6,3.0
+Pumpwell,Thokottu,1.2,6.0
+Thokottu,Deralakatte,0.9,4.5
+Deralakatte,Mangalore University,1.0,5.0
+Mangalore University,Konaje,1.1,5.5
+Konaje,Inoli Temple,0.8,4.0
+Thokottu,Ullal,1.0,5.0
+Ullal,Someshwar,0.9,4.5
+Thokottu,Kotekar,0.7,3.5
+Kotekar,Talapady,1.3,6.5
+Kankanady,Surathkal,2.5,12.5
+Surathkal,NITK,0.5,2.0
+NITK,Mukka,0.6,2.5
+Mukka,Sasihithlu,1.0,4.0
+Panambur,Baikampady,0.8,3.5
+Baikampady,Jokatte,1.0,4.5
+Jokatte,Bajpe Airport,0.9,4.0
+Bajpe Airport,Kenjaru,0.6,2.5
+Kenjaru,Porkodi,0.5,2.0
+Porkodi,Maravoor,0.7,3.0
+Maravoor,Kunjathbail,0.8,3.5
+Kavoor,Markada,0.5,2.0
+Markada,Kunjathbail,0.6,2.5
+Kulur,Tannirbavi Beach,1.2,5.5
+Tannirbavi Beach,Bengre,0.7,3.0
+Bengre,Panambur,1.0,4.5

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mangaluru Bus Navigator</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #222; }
+
+    header {
+      background: #0f6e56; color: white;
+      padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    header h1 { font-size: 18px; font-weight: 600; }
+    header span { font-size: 13px; opacity: 0.8; }
+
+    .layout { display: flex; height: calc(100vh - 52px); }
+
+    /* Sidebar */
+    .sidebar {
+      width: 360px; min-width: 300px;
+      background: white;
+      border-right: 1px solid #e2e2dc;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+
+    .tabs { display: flex; border-bottom: 1px solid #e2e2dc; }
+    .tab {
+      flex: 1; padding: 12px 8px;
+      font-size: 13px; text-align: center;
+      cursor: pointer; border: none;
+      background: none; color: #666; font-weight: 500;
+    }
+    .tab.active { color: #0f6e56; border-bottom: 2px solid #0f6e56; }
+
+    .panel { display: none; flex-direction: column; flex: 1; overflow: hidden; padding: 16px; }
+    .panel.active { display: flex; }
+
+    label { font-size: 12px; font-weight: 500; color: #555; margin-bottom: 4px; display: block; margin-top: 8px; }
+    select, input {
+      width: 100%; padding: 8px 10px;
+      border: 1px solid #ddd; border-radius: 6px;
+      font-size: 13px; color: #222;
+      background: white; margin-bottom: 12px;
+    }
+    select:focus, input:focus { outline: none; border-color: #0f6e56; }
+
+    .btn {
+      width: 100%; padding: 10px;
+      background: #0f6e56; color: white;
+      border: none; border-radius: 6px;
+      font-size: 14px; font-weight: 500;
+      cursor: pointer; margin-top: 4px;
+    }
+    .btn:hover { background: #0a5040; }
+    .btn.secondary { background: #f0f0ea; color: #333; margin-top: 8px; }
+    .btn.secondary:hover { background: #e2e2dc; }
+
+    .result-box {
+      margin-top: 14px; padding: 12px;
+      background: #f5f5f0; border-radius: 8px;
+      font-size: 13px; line-height: 1.6; flex-shrink: 0;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .route-tag {
+      display: inline-block; background: #0f6e56;
+      color: white; padding: 2px 8px;
+      border-radius: 10px; font-size: 11px; margin: 2px;
+    }
+    .hop-count { font-size: 22px; font-weight: 700; color: #0f6e56; }
+    .error-msg { color: #c0392b; }
+    .stats-row { display: flex; gap: 16px; margin: 8px 0; }
+    .stat { flex: 1; text-align: center; }
+    .stat-value { font-size: 18px; font-weight: 700; color: #0f6e56; }
+    .stat-label { font-size: 11px; color: #888; }
+
+    .stop-list { overflow-y: auto; flex: 1; margin-top: 10px; }
+    .stop-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 12px; border-radius: 6px;
+      cursor: pointer; border: 1px solid transparent; margin-bottom: 4px;
+    }
+    .stop-item:hover { background: #f0f8f5; border-color: #c2e0d8; }
+    .stop-name { font-size: 13px; font-weight: 500; }
+    .stop-zone { font-size: 11px; color: #888; }
+    .hub-badge {
+      font-size: 10px; background: #faeeda;
+      color: #854F0B; padding: 1px 6px;
+      border-radius: 8px; font-weight: 500;
+    }
+
+    .hub-card {
+      padding: 10px 12px; border-radius: 6px;
+      background: #f5f5f0; margin-bottom: 6px; cursor: pointer;
+    }
+    .hub-card:hover { background: #e8f5f0; }
+    .hub-card-name { font-size: 13px; font-weight: 600; }
+    .hub-card-zone { font-size: 12px; color: #666; margin-top: 2px; }
+    .hub-bar { height: 4px; border-radius: 2px; background: #0f6e56; margin-top: 6px; }
+
+    #map { flex: 1; }
+
+    .leaflet-popup-content {
+      font-family: -apple-system, sans-serif;
+      font-size: 13px; min-width: 160px;
+    }
+    .leaflet-popup-content b { display: block; font-size: 14px; margin-bottom: 4px; }
+    .popup-route {
+      display: inline-block; background: #e8f5f0;
+      color: #0f6e56; padding: 2px 6px;
+      border-radius: 8px; font-size: 11px; margin: 2px;
+    }
+    
+    .optimize-group {
+      display: flex; gap: 8px; margin-bottom: 12px;
+    }
+    .optimize-btn {
+      flex: 1; padding: 6px; font-size: 12px;
+      background: #f0f0ea; border: 1px solid #ddd;
+      border-radius: 6px; cursor: pointer;
+    }
+    .optimize-btn.active {
+      background: #0f6e56; color: white; border-color: #0f6e56;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Mangaluru Bus Navigator</h1>
+    <span>Graph-powered route finder · Neo4j + OpenStreetMap</span>
+  </div>
+  <div style="font-size:12px">
+    <span id="optimize-status">⚡ Distance optimization</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('find')">Find Route</button>
+      <button class="tab" onclick="switchTab('stops')">All Stops</button>
+      <button class="tab" onclick="switchTab('hubs')">Top Hubs</button>
+    </div>
+
+    <!-- Find Route Panel -->
+    <div class="panel active" id="panel-find">
+      <label>📍 From</label>
+      <select id="sel-from"><option value="">Select starting stop...</option></select>
+      <label>📍 To</label>
+      <select id="sel-to"><option value="">Select destination stop...</option></select>
+      
+      <label>⚙️ Optimize By</label>
+      <div class="optimize-group">
+        <button class="optimize-btn active" data-opt="distance" onclick="setOptimization('distance')">📏 Shortest Distance</button>
+        <button class="optimize-btn" data-opt="time" onclick="setOptimization('time')">⏱️ Fastest Time</button>
+        <button class="optimize-btn" data-opt="transfers" onclick="setOptimization('transfers')">🔄 Fewest Transfers</button>
+      </div>
+      
+      <button class="btn" onclick="findPath()">Find Route</button>
+      <button class="btn secondary" onclick="showReachable()">Show Reachable Stops (4 hops)</button>
+      <div id="path-result" class="result-box" style="display:none"></div>
+    </div>
+
+    <!-- All Stops Panel -->
+    <div class="panel" id="panel-stops">
+      <input
+        type="text" id="stop-search"
+        placeholder="🔍 Search stops..."
+        oninput="filterStops(this.value)"
+      >
+      <div class="stop-list" id="stop-list"></div>
+    </div>
+
+    <!-- Top Hubs Panel -->
+    <div class="panel" id="panel-hubs">
+      <p style="font-size:12px;color:#666;margin-bottom:12px;">
+        🏆 Stops ranked by number of routes — the most critical transfer points in the network.
+      </p>
+      <div id="hub-list" style="overflow-y:auto;flex:1;"></div>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Map setup
+const map = L.map('map').setView([12.8698, 74.8426], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+const API = '';  // same origin as Flask
+
+// State
+let allStops = [];
+let stopMarkers = {};
+let pathLayers = [];
+let reachLayers = [];
+let currentOptimization = 'distance';
+
+// Icons
+const hubIcon = L.divIcon({
+  html: '<div style="width:14px;height:14px;background:#0f6e56;border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>',
+  iconSize: [14,14], iconAnchor: [7,7], className: ''
+});
+const stopIcon = L.divIcon({
+  html: '<div style="width:9px;height:9px;background:#1D9E75;border:1.5px solid white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.2)"></div>',
+  iconSize: [9,9], iconAnchor: [4.5,4.5], className: ''
+});
+const startIcon = L.divIcon({
+  html: '<div style="width:16px;height:16px;background:#185FA5;border:2.5px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>',
+  iconSize: [16,16], iconAnchor: [8,8], className: ''
+});
+const endIcon = L.divIcon({
+  html: '<div style="width:16px;height:16px;background:#D85A30;border:2.5px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>',
+  iconSize: [16,16], iconAnchor: [8,8], className: ''
+});
+
+// Set optimization method
+function setOptimization(opt) {
+  currentOptimization = opt;
+  document.querySelectorAll('.optimize-btn').forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.dataset.opt === opt) btn.classList.add('active');
+  });
+  
+  const statusText = {
+    'distance': '📏 Distance optimization',
+    'time': '⏱️ Time optimization',
+    'transfers': '🔄 Transfer minimization'
+  };
+  document.getElementById('optimize-status').innerText = statusText[opt];
+}
+
+// Load all stops
+async function loadStops() {
+  const res = await fetch(`${API}/api/stops`);
+  allStops = await res.json();
+
+  const fromSel = document.getElementById('sel-from');
+  const toSel = document.getElementById('sel-to');
+
+  allStops.forEach(s => {
+    fromSel.add(new Option(s.name, s.id));
+    toSel.add(new Option(s.name, s.id));
+
+    const marker = L.marker([s.lat, s.lng], { icon: s.is_hub ? hubIcon : stopIcon })
+      .addTo(map)
+      .bindPopup(buildPopup(s));
+    stopMarkers[s.id] = marker;
+  });
+
+  renderStopList(allStops);
+}
+
+function buildPopup(s) {
+  return `
+    <b>${s.name}</b><br>
+    Zone: ${s.zone}<br>
+    ${s.is_hub ? '<span style="color:#0f6e56;font-weight:600">🏛️ Major hub</span><br>' : ''}
+    <div id="pr-${s.id}" style="margin-top:6px"></div>
+    <script>fetchPopupRoutes('${s.id}')<\/script>
+  `;
+}
+
+async function fetchPopupRoutes(id) {
+  const el = document.getElementById(`pr-${id}`);
+  if (!el) return;
+  const res = await fetch(`${API}/api/routes-through/${id}`);
+  const data = await res.json();
+  el.innerHTML = data.map(r => `<span class="popup-route">${r.route_no}</span>`).join('');
+}
+
+// Find path
+async function findPath() {
+  clearLayers();
+  const fromId = document.getElementById('sel-from').value;
+  const toId = document.getElementById('sel-to').value;
+
+  if (!fromId || !toId) {
+    showResult('<span class="error-msg">❌ Please select both a starting stop and destination.</span>');
+    return;
+  }
+
+  showResult('<em style="color:#888">🔍 Finding optimized route...</em>');
+
+  const res = await fetch(`${API}/api/find-path?from_id=${fromId}&to_id=${toId}&optimize_by=${currentOptimization}`);
+  const data = await res.json();
+
+  if (data.error) {
+    showResult(`<span class="error-msg">❌ ${data.error}</span>`);
+    return;
+  }
+
+  const { stops, routes_used, route_segments, hops, transfers, distance_km, time_min, optimization } = data;
+
+  // Draw route line on map
+  const latlngs = stops.map(s => [s.lat, s.lng]);
+  const line = L.polyline(latlngs, { color: '#0f6e56', weight: 5, opacity: 0.85 }).addTo(map);
+  pathLayers.push(line);
+
+  // Start and end markers
+  const sm = L.marker([stops[0].lat, stops[0].lng], { icon: startIcon })
+    .addTo(map).bindPopup(`<b>🚀 Start: ${stops[0].name}</b>`).openPopup();
+  const em = L.marker([stops[stops.length-1].lat, stops[stops.length-1].lng], { icon: endIcon })
+    .addTo(map).bindPopup(`<b>🏁 End: ${stops[stops.length-1].name}</b>`);
+  pathLayers.push(sm, em);
+
+  map.fitBounds(line.getBounds(), { padding: [40, 40] });
+
+  const tags = routes_used.map(r => `<span class="route-tag">🚌 ${r}</span>`).join('');
+  const stopPath = stops.map(s => s.name).join(' → ');
+
+  const segmentHtml = (route_segments || []).map(seg =>
+    `<div style="margin-top:4px;"><span class="route-tag">🚌 ${seg.route_no}</span> ${seg.from_stop} → ${seg.to_stop}</div>`
+  ).join('');
+
+  const optimizationLabels = {
+    'distance': '📏 Shortest Distance',
+    'time': '⏱️ Fastest Time',
+    'transfers': '🔄 Fewest Transfers'
+  };
+
+  showResult(`
+    <div style="margin-bottom:8px;font-size:11px;color:#0f6e56;font-weight:600">${optimizationLabels[optimization] || 'Route Found'}</div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-value">${hops}</div><div class="stat-label">stops</div></div>
+      <div class="stat"><div class="stat-value">${transfers}</div><div class="stat-label">transfers</div></div>
+      <div class="stat"><div class="stat-value">${distance_km}</div><div class="stat-label">km</div></div>
+      <div class="stat"><div class="stat-value">${time_min}</div><div class="stat-label">min</div></div>
+    </div>
+    <div style="margin:8px 0;color:#555;font-size:12px;">Routes: ${tags}</div>
+    <details>
+      <summary style="cursor:pointer;font-size:12px;color:#0f6e56;margin:8px 0;">📋 View route details</summary>
+      <div style="font-size:12px;color:#444;line-height:1.7;margin-top:8px;">${stopPath}</div>
+      <div style="font-size:12px;color:#444;line-height:1.6;margin-top:8px;">${segmentHtml}</div>
+    </details>
+  `);
+}
+
+// Show reachable stops
+async function showReachable() {
+  clearLayers();
+  const stopId = document.getElementById('sel-from').value;
+  if (!stopId) {
+    showResult('<span class="error-msg">❌ Select a starting stop first.</span>');
+    return;
+  }
+
+  showResult('<em style="color:#888">🔍 Computing reachable stops...</em>');
+  const res = await fetch(`${API}/api/reachable?stop_id=${stopId}&max_hops=4`);
+  const data = await res.json();
+
+  data.forEach(s => {
+    const c = L.circleMarker([s.lat, s.lng], {
+      radius: 8, color: '#185FA5',
+      fillColor: '#378ADD', fillOpacity: 0.7, weight: 1.5
+    }).addTo(map).bindPopup(`<b>${s.name}</b><br>${s.zone}`);
+    reachLayers.push(c);
+  });
+
+  const origin = allStops.find(s => s.id === stopId);
+  showResult(`
+    <div class="hop-count">${data.length}</div>
+    <div style="color:#555;font-size:12px;">
+      stops reachable from <strong>${origin ? origin.name : stopId}</strong> within 4 stops
+    </div>
+  `);
+}
+
+// Load hubs
+async function loadHubs() {
+  const res = await fetch(`${API}/api/hubs`);
+  const hubs = await res.json();
+  const max = hubs[0]?.route_count || 1;
+  const el = document.getElementById('hub-list');
+
+  el.innerHTML = hubs.map((h, i) => `
+    <div class="hub-card" onclick="focusStop('${h.id}')">
+      <div style="display:flex;justify-content:space-between">
+        <span class="hub-card-name">${i+1}. ${h.name}</span>
+        <span style="font-size:12px;color:#0f6e56;font-weight:600">${h.route_count} routes</span>
+      </div>
+      <div class="hub-card-zone">${h.zone}</div>
+      <div class="hub-bar" style="width:${Math.round((h.route_count/max)*100)}%"></div>
+    </div>
+  `).join('');
+}
+
+// Render stop list
+function renderStopList(stops) {
+  document.getElementById('stop-list').innerHTML = stops.map(s => `
+    <div class="stop-item" onclick="focusStop('${s.id}')">
+      <div>
+        <div class="stop-name">${s.name}</div>
+        <div class="stop-zone">${s.zone}</div>
+      </div>
+      ${s.is_hub ? '<span class="hub-badge">Hub</span>' : ''}
+    </div>
+  `).join('');
+}
+
+function filterStops(q) {
+  const filtered = allStops.filter(s =>
+    s.name.toLowerCase().includes(q.toLowerCase())
+  );
+  renderStopList(filtered);
+}
+
+function focusStop(id) {
+  const m = stopMarkers[id];
+  if (m) { map.setView(m.getLatLng(), 15); m.openPopup(); }
+}
+
+// Utilities
+function clearLayers() {
+  [...pathLayers, ...reachLayers].forEach(l => map.removeLayer(l));
+  pathLayers = [];
+  reachLayers = [];
+}
+
+function showResult(html) {
+  const box = document.getElementById('path-result');
+  box.style.display = 'block';
+  box.innerHTML = html;
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', ['find', 'stops', 'hubs'][i] === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${name}`).classList.add('active');
+}
+
+// Init
+loadStops();
+loadHubs();
+</script>
+</body>
+</html>
