@@ -1,9 +1,60 @@
+# Environment Variables (CRITICAL - Never commit these)
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Python
 __pycache__/
 *.py[cod]
-.env
-.venv/
-venv/
+*.so
+*.egg
+*.egg-info/
 dist/
 build/
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
 Thumbs.db
+*.sublime-project
+*.sublime-workspace
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# OS files
+.AppleDouble
+.LSOverride
+._*
+
+# Node (if using frontend build tools later)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Backup files
+*.bak
+*.backup
+*~

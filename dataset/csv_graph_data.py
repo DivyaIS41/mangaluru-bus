@@ -19,11 +19,12 @@ DATA_DIR = BASE_DIR.parent / "data"
 # City center coordinates (Mangaluru)
 CITY_CENTER = (12.8698, 74.8426)
 
-# CSV file paths
-CSV_FILES = [
-    BASE_DIR / "csv" / "bus-data.csv",
-    BASE_DIR / "csv" / "bus-data-old.csv",
-]
+# Canonical route CSV source.
+# We intentionally load one network version at a time to avoid mixing
+# alternate route datasets into a single graph.
+PRIMARY_ROUTE_CSV = BASE_DIR / "csv" / "bus-data-old.csv"
+
+CSV_FILES = [PRIMARY_ROUTE_CSV]
 
 STOPS_CSV = DATA_DIR / "stops.csv"
 DISTANCES_CSV = DATA_DIR / "stop_distances.csv"
@@ -242,7 +243,6 @@ def load_precomputed_distances():
 def _read_routes(csv_paths):
     """Read routes from CSV files"""
     routes = []
-    seen_signatures = set()
 
     for path in csv_paths:
         if not path.exists():
@@ -260,11 +260,6 @@ def _read_routes(csv_paths):
                 if len(stops) < 2:
                     continue
 
-                signature = (bus_no, tuple(stops))
-                if signature in seen_signatures:
-                    continue
-                seen_signatures.add(signature)
-
                 row_id = (row.get("id") or "").strip() or str(len(routes) + 1)
                 route_id = f"{bus_no or 'R'}-{row_id}-{slugify(description)}-{slugify(path.stem)}"
                 routes.append(
@@ -274,11 +269,12 @@ def _read_routes(csv_paths):
                         "name": description,
                         "operator": "CSV Import",
                         "source_file": path.name,
+                        "source_row_id": row_id,
                         "stops": stops,
                     }
                 )
 
-    print(f"  Read {len(routes)} unique routes from CSV files")
+    print(f"  Read {len(routes)} route rows from CSV files")
     return routes
 
 
@@ -420,6 +416,7 @@ def build_graph_dataset(csv_paths=None):
                 "name": route["name"],
                 "operator": route["operator"],
                 "source_file": route["source_file"],
+                "source_row_id": route.get("source_row_id"),
                 "stops": [stop_id_lookup[name] for name in route["stops"]],
                 "stop_names": route["stops"],
             }

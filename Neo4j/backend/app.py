@@ -4,11 +4,19 @@ Flask backend for the Mangaluru Bus Navigator.
 
 import heapq
 import os
+import sys
 from collections import defaultdict
+from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
 from neo4j import GraphDatabase
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from config import get_neo4j_config
 
 app = Flask(
     __name__,
@@ -17,11 +25,14 @@ app = Flask(
 )
 CORS(app)
 
-NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "")
+NEO4J_CONFIG = get_neo4j_config()
+NEO4J_URI = NEO4J_CONFIG["uri"]
+NEO4J_USER = NEO4J_CONFIG["user"]
+NEO4J_PASSWORD = NEO4J_CONFIG["password"]
 
-TRANSFER_PENALTY = 1.25
+TRANSFER_PENALTY_DISTANCE = 0.0
+TRANSFER_PENALTY_TIME = 8.0
+DEFAULT_DWELL_TIME_MIN = 1.5
 
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
@@ -53,6 +64,7 @@ def load_route_graph(weight_field="weight_distance"):
     rows = run_query(
         f"""
         MATCH (a:BusStop)-[rel:NEXT_STOP]->(b:BusStop)
+        WHERE COALESCE(rel.reverse_of, false) = false
         RETURN a.id AS from_id, b.id AS to_id,
                rel.route_id AS route_id, rel.route_no AS route_no,
                COALESCE(rel.distance_km, 0.5) AS distance_km,
@@ -110,6 +122,45 @@ def build_route_segments(stop_sequence, route_sequence, stops):
     return route_segments
 
 
+def find_direct_route_options(from_id, to_id):
+    rows = run_query(
+        """
+        MATCH (start:BusStop {id: $from_id}), (end:BusStop {id: $to_id})
+        MATCH (r:Route)-[:SERVES]->(start)
+        MATCH (r)-[:SERVES]->(end)
+        CALL {
+            WITH start, end, r
+            MATCH path = (start)-[:NEXT_STOP*1..80]-(end)
+            WHERE all(rel IN relationships(path) WHERE rel.route_id = r.route_id)
+            RETURN path
+            ORDER BY length(path)
+            LIMIT 1
+        }
+        RETURN DISTINCT
+            r.route_id AS route_id,
+            r.route_no AS route_no,
+            r.name AS name,
+            r.source_file AS source_file,
+            r.source_row_id AS source_row_id,
+            length(path) AS stop_count,
+            [s IN nodes(path) | s.name] AS stops
+        ORDER BY r.route_no, r.name, stop_count
+        """,
+        from_id=from_id,
+        to_id=to_id,
+    )
+
+    seen_route_ids = set()
+    options = []
+    for row in rows:
+        if row["route_id"] in seen_route_ids:
+            continue
+        seen_route_ids.add(row["route_id"])
+        options.append(row)
+
+    return options
+
+
 def find_path_by_transfers(from_id, to_id):
     stops = build_stop_lookup()
     adjacency = load_route_graph("hops")
@@ -117,16 +168,16 @@ def find_path_by_transfers(from_id, to_id):
     if from_id not in stops or to_id not in stops:
         return None
 
-    queue = [(0, 0, from_id, None)]
-    best_cost = {(from_id, None): (0, 0)}
+    queue = [(0, 0.0, 0, from_id, None)]
+    best_cost = {(from_id, None): (0, 0.0, 0)}
     previous = {}
     best_target = None
 
     while queue:
-        transfers, hops, node_id, current_route = heapq.heappop(queue)
+        transfers, total_time, hops, node_id, current_route = heapq.heappop(queue)
         state = (node_id, current_route)
 
-        if best_cost.get(state) != (transfers, hops):
+        if best_cost.get(state) != (transfers, total_time, hops):
             continue
 
         if node_id == to_id:
@@ -135,8 +186,10 @@ def find_path_by_transfers(from_id, to_id):
 
         for edge in adjacency.get(node_id, []):
             next_route = edge["route_id"]
-            next_transfers = transfers + (1 if current_route and current_route != next_route else 0)
-            candidate = (next_transfers, hops + 1)
+            route_changed = current_route and current_route != next_route
+            next_transfers = transfers + (1 if route_changed else 0)
+            next_total_time = total_time + edge["time_min"] + DEFAULT_DWELL_TIME_MIN + (TRANSFER_PENALTY_TIME if route_changed else 0.0)
+            candidate = (next_transfers, round(next_total_time, 6), hops + 1)
             next_state = (edge["to_id"], next_route)
 
             if next_state not in best_cost or candidate < best_cost[next_state]:
@@ -170,10 +223,11 @@ def find_path_by_transfers(from_id, to_id):
         if not routes_used or routes_used[-1] != route_no:
             routes_used.append(route_no)
 
-    transfers, hops = best_cost[best_target]
+    transfers, _, hops = best_cost[best_target]
     return {
         "stops": [stops[stop_id] for stop_id in stop_sequence],
         "routes_used": routes_used,
+        "direct_route_options": find_direct_route_options(from_id, to_id),
         "route_segments": build_route_segments(stop_sequence, route_sequence, stops),
         "hops": hops,
         "transfers": transfers,
@@ -208,11 +262,14 @@ def find_weighted_path(from_id, to_id, weight_field, optimize_by):
 
         for edge in adjacency.get(node_id, []):
             next_route = edge["route_id"]
-            next_transfers = transfers + (1 if current_route and current_route != next_route else 0)
+            route_changed = current_route and current_route != next_route
+            next_transfers = transfers + (1 if route_changed else 0)
             step_cost = edge["weight"]
 
-            if current_route and current_route != next_route:
-                step_cost += TRANSFER_PENALTY
+            if optimize_by == "distance":
+                step_cost += TRANSFER_PENALTY_DISTANCE if route_changed else 0.0
+            elif optimize_by == "time":
+                step_cost += DEFAULT_DWELL_TIME_MIN + (TRANSFER_PENALTY_TIME if route_changed else 0.0)
 
             candidate = (
                 round(total_cost + step_cost, 6),
@@ -261,6 +318,7 @@ def find_weighted_path(from_id, to_id, weight_field, optimize_by):
     return {
         "stops": [stops[stop_id] for stop_id in stop_sequence],
         "routes_used": routes_used,
+        "direct_route_options": find_direct_route_options(from_id, to_id),
         "route_segments": build_route_segments(stop_sequence, route_sequence, stops),
         "hops": hops,
         "transfers": transfers,
@@ -302,6 +360,21 @@ def get_routes():
     return jsonify(rows)
 
 
+@app.route("/api/network-summary")
+def get_network_summary():
+    rows = run_query(
+        """
+        MATCH (s:BusStop)
+        WITH count(s) AS stop_count
+        MATCH (r:Route)
+        WITH stop_count, count(r) AS route_count
+        MATCH ()-[rel:NEXT_STOP]->()
+        RETURN stop_count, route_count, count(rel) AS edge_count
+        """
+    )
+    return jsonify(rows[0] if rows else {"stop_count": 0, "route_count": 0, "edge_count": 0})
+
+
 @app.route("/api/find-path")
 def find_path():
     from_id = request.args.get("from_id")
@@ -323,7 +396,7 @@ def find_path():
             result = find_weighted_path(from_id, to_id, "weight_distance", "distance")
 
         if not result:
-            return jsonify({"error": "No path found between these stops"}), 404
+            return jsonify({"error": "No path found between these stops", "found": False})
 
         return jsonify(result)
     except Exception as exc:

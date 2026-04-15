@@ -4,18 +4,20 @@ Simple loader for Mangaluru bus network
 
 import sys
 import math
-import os
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from neo4j import GraphDatabase
+from config import get_neo4j_config
 from csv_graph_data import build_graph_dataset
 
-NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "")
+NEO4J_CONFIG = get_neo4j_config()
+NEO4J_URI = NEO4J_CONFIG["uri"]
+NEO4J_USER = NEO4J_CONFIG["user"]
+NEO4J_PASSWORD = NEO4J_CONFIG["password"]
 
 def haversine_km(lat1, lng1, lat2, lng2):
     radius = 6371.0

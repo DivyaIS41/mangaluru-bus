@@ -7,14 +7,23 @@ Usage:
 """
 
 import math
-import os
+import sys
+from pathlib import Path
+
 from neo4j import GraphDatabase
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from config import get_neo4j_config
 from csv_graph_data import build_graph_dataset
 
 # Neo4j configuration
-NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "")
+NEO4J_CONFIG = get_neo4j_config()
+NEO4J_URI = NEO4J_CONFIG["uri"]
+NEO4J_USER = NEO4J_CONFIG["user"]
+NEO4J_PASSWORD = NEO4J_CONFIG["password"]
 
 
 def haversine_km(lat1, lng1, lat2, lng2):
@@ -29,6 +38,34 @@ def haversine_km(lat1, lng1, lat2, lng2):
         * math.sin(d_lng / 2) ** 2
     )
     return radius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def estimate_time_minutes(distance_km, from_stop, to_stop):
+    """
+    Derive a more realistic travel-time heuristic than a fixed min/km ratio.
+    This intentionally differs from raw distance so time-optimized results can
+    diverge from shortest-distance results.
+    """
+    avg_speed_kmph = 22.0
+    if from_stop["zone"] == "City Centre" or to_stop["zone"] == "City Centre":
+        avg_speed_kmph = 14.0
+    elif from_stop["is_hub"] or to_stop["is_hub"]:
+        avg_speed_kmph = 16.0
+    elif distance_km >= 6:
+        avg_speed_kmph = 28.0
+
+    base_time = (distance_km / max(avg_speed_kmph, 1.0)) * 60.0
+    dwell_penalty = 1.2
+    if from_stop["is_hub"]:
+        dwell_penalty += 1.3
+    if to_stop["is_hub"]:
+        dwell_penalty += 1.0
+    if from_stop["zone"] == "City Centre":
+        dwell_penalty += 0.8
+    if to_stop["zone"] == "City Centre":
+        dwell_penalty += 0.5
+
+    return max(base_time + dwell_penalty, 1.0)
 
 
 def clear_db(session):
@@ -85,13 +122,15 @@ def load_routes_and_edges(session, routes, edge_distances):
             SET r.route_no = $route_no,
                 r.name = $name,
                 r.operator = $operator,
-                r.source_file = $source_file
+                r.source_file = $source_file,
+                r.source_row_id = $source_row_id
             """,
             route_id=route["route_id"],
             route_no=route["route_no"],
             name=route["name"],
             operator=route["operator"],
             source_file=route["source_file"],
+            source_row_id=route.get("source_row_id"),
         )
 
         stops = route["stops"]
@@ -125,18 +164,33 @@ def load_routes_and_edges(session, routes, edge_distances):
                 # Fallback to haversine (should not happen with proper data)
                 # Get coordinates
                 from_coords = session.run(
-                    "MATCH (s:BusStop {id: $id}) RETURN s.lat AS lat, s.lng AS lng",
+                    "MATCH (s:BusStop {id: $id}) RETURN s.lat AS lat, s.lng AS lng, s.zone AS zone, s.is_hub AS is_hub",
                     id=from_id
                 ).single()
                 to_coords = session.run(
-                    "MATCH (s:BusStop {id: $id}) RETURN s.lat AS lat, s.lng AS lng",
+                    "MATCH (s:BusStop {id: $id}) RETURN s.lat AS lat, s.lng AS lng, s.zone AS zone, s.is_hub AS is_hub",
                     id=to_id
                 ).single()
                 distance_km = haversine_km(
                     from_coords["lat"], from_coords["lng"],
                     to_coords["lat"], to_coords["lng"]
                 )
-                time_min = distance_km * 3.5
+                time_min = estimate_time_minutes(distance_km, from_coords, to_coords)
+
+            if edge_key in edge_distances:
+                from_meta = session.run(
+                    "MATCH (s:BusStop {id: $id}) RETURN s.zone AS zone, s.is_hub AS is_hub",
+                    id=from_id
+                ).single()
+                to_meta = session.run(
+                    "MATCH (s:BusStop {id: $id}) RETURN s.zone AS zone, s.is_hub AS is_hub",
+                    id=to_id
+                ).single()
+                time_min = estimate_time_minutes(
+                    distance_km,
+                    {"zone": from_meta["zone"], "is_hub": from_meta["is_hub"]},
+                    {"zone": to_meta["zone"], "is_hub": to_meta["is_hub"]},
+                )
             
             session.run(
                 """
@@ -198,23 +252,6 @@ def load_zones(session, stops):
             zone=zone,
         )
     print(f"  Loaded {len(zones)} zones.")
-
-
-def create_reverse_edges(session):
-    """Create reverse NEXT_STOP relationships for bidirectional traversal"""
-    # Keep the graph traversable in both directions using the same relationship type.
-    session.run(
-        """
-        MATCH (a)-[rel:NEXT_STOP]->(b)
-        MERGE (b)-[rev:NEXT_STOP {route_id: rel.route_id, seq: rel.seq, reverse_of: true}]->(a)
-        SET rev.route_no = rel.route_no,
-            rev.distance_km = rel.distance_km,
-            rev.time_min = rel.time_min,
-            rev.weight_distance = rel.weight_distance,
-            rev.weight_time = rel.weight_time
-        """
-    )
-    print("  Created reverse NEXT_STOP relationships.")
 
 
 def verify(session):
@@ -281,7 +318,6 @@ def main():
         load_routes_and_edges(session, dataset["routes"], dataset["edge_distances"])
         load_landmarks(session, dataset["landmarks"])
         load_zones(session, dataset["stops"])
-        create_reverse_edges(session)
         verify(session)
 
     driver.close()

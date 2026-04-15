@@ -304,7 +304,7 @@ async function findPath() {
     return;
   }
 
-  const { stops, routes_used, route_segments, hops, transfers, distance_km, time_min, optimization } = data;
+  const { stops, routes_used, direct_route_options, route_segments, hops, transfers, distance_km, time_min, optimization } = data;
 
   // Draw route line on map
   const latlngs = stops.map(s => [s.lat, s.lng]);
@@ -327,6 +327,17 @@ async function findPath() {
     `<div style="margin-top:4px;"><span class="route-tag">🚌 ${seg.route_no}</span> ${seg.from_stop} → ${seg.to_stop}</div>`
   ).join('');
 
+  const directOptions = direct_route_options || [];
+  const directOptionsHtml = directOptions.length
+    ? directOptions.map(route => `
+        <div style="margin-top:6px;padding:6px;border-radius:6px;background:white;">
+          <span class="route-tag">Bus ${route.route_no}</span>
+          <strong>${route.name}</strong>
+          <div style="font-size:11px;color:#666;margin-top:2px;">${route.stop_count} stop${route.stop_count !== 1 ? 's' : ''} between selected points</div>
+        </div>
+      `).join('')
+    : '<div style="font-size:12px;color:#888;margin-top:6px;">No single direct bus route contains both selected stops. Use the optimized transfer route above.</div>';
+
   const optimizationLabels = {
     'distance': '📏 Shortest Distance',
     'time': '⏱️ Fastest Time',
@@ -341,7 +352,11 @@ async function findPath() {
       <div class="stat"><div class="stat-value">${distance_km}</div><div class="stat-label">km</div></div>
       <div class="stat"><div class="stat-value">${time_min}</div><div class="stat-label">min</div></div>
     </div>
-    <div style="margin:8px 0;color:#555;font-size:12px;">Routes: ${tags}</div>
+    <div style="margin:8px 0;color:#555;font-size:12px;">Optimized route uses: ${tags}</div>
+    <details open>
+      <summary style="cursor:pointer;font-size:12px;color:#0f6e56;margin:8px 0;">All direct bus numbers for these stops (${directOptions.length})</summary>
+      <div style="font-size:12px;color:#444;line-height:1.5;margin-top:8px;">${directOptionsHtml}</div>
+    </details>
     <details>
       <summary style="cursor:pointer;font-size:12px;color:#0f6e56;margin:8px 0;">📋 View route details</summary>
       <div style="font-size:12px;color:#444;line-height:1.7;margin-top:8px;">${stopPath}</div>

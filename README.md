@@ -1,100 +1,395 @@
 # Mangaluru Bus Navigator
 
-A graph-based bus route exploration project built with `Flask`, `Neo4j`, and `Leaflet`.
+[![Security Checks](https://github.com/yourusername/mangaluru-bus/workflows/Security%20Checks/badge.svg)](https://github.com/yourusername/mangaluru-bus/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.8+](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
-The project models the Mangaluru bus network as a graph where bus stops are connected in route order. It lets users:
+A smart graph-based bus route explorer for Mangaluru city built with **Flask**, **Neo4j**, and **Leaflet**. Find optimal bus routes, explore stops on an interactive map, and discover transit patterns using powerful graph algorithms.
 
-- browse bus stops on a map,
-- inspect major hubs,
-- find routes between two stops,
-- compare route choices by distance, time, or transfers.
+## ✨ Features
 
-## What This Project Does
+- 🗺️ **Interactive Map** - Explore bus stops and routes on OpenStreetMap
+- 🔍 **Smart Search** - Find stops and routes by name instantly
+- 🚌 **Multi-Route Paths** - Discover optimal routes with transfers
+- 📊 **Route Optimization** - Compare paths by distance or travel time
+- 🎯 **Direct Routes** - Find single-bus connections between stops
+- 🌐 **REST API** - Programmatic access to all features
+- 📱 **Responsive Design** - Works on desktop and mobile
 
-The application converts bus route CSV data into a Neo4j graph and exposes that graph through a Flask API. A Leaflet frontend consumes the API and renders stops, routes, and path results on an interactive map.
+## 🚀 Quick Start
 
-At a high level:
+### Prerequisites
 
-- `dataset/` prepares and loads graph data into Neo4j.
-- `Neo4j/backend/` provides API endpoints for the frontend.
-- `frontend/templates/` contains the map-based UI.
+- Python 3.8 or higher
+- Neo4j 4.x or 5.x
+- Git
 
-## Tech Stack
+### Installation
 
-- `Python`
-- `Flask`
-- `Neo4j`
-- `Cypher`
-- `Leaflet`
-- `OpenStreetMap`
+1. **Clone repository**
+   ```bash
+   git clone https://github.com/yourusername/mangaluru-bus.git
+   cd mangaluru-bus
+   ```
 
-## Project Structure
+2. **Create virtual environment**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
 
-```text
-mangaluru-bus/
-|-- README.md
-|-- data/
-|   |-- stops.csv
-|   |-- stop_distances.csv
-|-- dataset/
-|   |-- csv/
-|   |   |-- bus-data.csv
-|   |   |-- bus-data-old.csv
-|   |-- csv_graph_data.py
-|   |-- load_graph.py
-|-- Neo4j/
-|   |-- backend/
-|   |   |-- app.py
-|-- frontend/
-|   |-- templates/
-|   |   |-- index.html
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Configure environment**
+   ```bash
+   cp .env.example .env.local
+   # Edit .env.local with your Neo4j credentials
+   ```
+
+5. **Load data**
+   ```bash
+   python dataset/load_graph.py
+   ```
+
+6. **Run application**
+   ```bash
+   cd Neo4j/backend
+   python app.py
+   ```
+
+7. **Open browser**
+   - Navigate to `http://localhost:5000`
+
+## 📚 Documentation
+
+- **[Development Guide](DEVELOPMENT.md)** - Setup, debugging, and development workflow
+- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
+- **[Backend API](Neo4j/backend/README.md)** - REST API endpoints and usage
+- **[Frontend](frontend/README.md)** - Web UI and JavaScript guide
+- **[Dataset Processing](dataset/README.md)** - Data loading and graph building
+- **[Data Files](data/README.md)** - CSV format and enrichment data
+
+## 🏗️ Architecture
+
+### Three-Tier Design
+
+```
+┌─────────────────────────────────────┐
+│  Frontend (Leaflet.js + HTML)       │  Interactive map interface
+├─────────────────────────────────────┤
+│  Backend (Flask + Python)           │  REST API & pathfinding
+├─────────────────────────────────────┤
+│  Database (Neo4j Graph)             │  Bus network graph
+└─────────────────────────────────────┘
 ```
 
-## How Neo4j Is Used
+### Key Components
 
-Neo4j is the core graph database in this project.
+| Component | Purpose | Location |
+|-----------|---------|----------|
+| **Data Processing** | Parse CSV → Graph transformation | `dataset/` |
+| **Graph Database** | Store bus network as graph | Neo4j instance |
+| **Backend API** | Query database & compute paths | `Neo4j/backend/app.py` |
+| **Web UI** | Interactive map interface | `frontend/templates/index.html` |
 
-The bus network is stored using:
+## 🗄️ Graph Schema
 
-- `(:BusStop)` nodes for bus stops
-- `(:Route)` nodes for bus routes
-- `(:Route)-[:SERVES]->(:BusStop)` relationships to show which stops belong to a route
-- `(:BusStop)-[:NEXT_STOP]->(:BusStop)` relationships to show stop-to-stop travel order
-- `(:Landmark)-[:NEAR]->(:BusStop)` relationships for nearby places
-- `(:BusStop)-[:IN_ZONE]->(:Zone)` relationships for zone grouping
+The project models the bus network as a property graph:
 
-This graph structure makes route traversal much more natural than storing the network only in tabular form.
+```
+BusStop (Node)
+├── id: Stop identifier
+├── name: Stop name
+├── lat: Latitude
+├── lng: Longitude
+├── zone: Geographic zone
+└── is_hub: Major interchange point?
 
-## Data Sources
+Route (Node)
+├── route_id: Route identifier
+├── route_no: Public route number
+├── name: Route description
+└── stops: All stops on this route
 
-The current system uses these route-sequence CSV files:
+Relationships:
+├── SERVES: Route ---[SERVES]---> BusStop
+├── NEXT_STOP: BusStop ---[NEXT_STOP]---> BusStop
+├── IN_ZONE: BusStop ---[IN_ZONE]---> Zone
+└── NEAR: BusStop ---[NEAR]---> Landmark
+```
 
-- `dataset/csv/bus-data.csv`
-- `dataset/csv/bus-data-old.csv`
+### Why Neo4j?
 
-These files contain:
+- **Natural Representation** - Bus routes are inherently graph-structured
+- **Path Queries** - Built-in support for route finding (Cypher)
+- **Performance** - Fast traversal of nested relationships
+- **Flexibility** - Easy to add new stop types or relationships
 
-- `id`
-- `busNumber`
-- `description`
-- `stops`
+## 📦 Data Sources
 
-The optional enrichment files are:
+### Primary Data
 
-- `data/stops.csv`
-- `data/stop_distances.csv`
+- **CSV Route Files** - `dataset/csv/bus-data.csv` - Bus routes with stop sequences
+- **Canonical Source** - Currently loads `bus-data-old.csv` (prevents version mixing)
 
-### `stops.csv`
+### Enrichment Files
 
-This file provides real stop coordinates and optional metadata.
+- **Stop Metadata** - `data/stops.csv` - Coordinates, zones, hub status
+- **Distance Data** - `data/stop_distances.csv` - Pre-calculated distances (optional)
 
-Expected format:
+### Data Format
 
+**Route CSV Structure:**
+```csv
+id,busNumber,description,stops
+1,1,City Loop,"Bus Stand,Balmatta,Car Street,..."
+```
+
+**Stops CSV Structure:**
 ```csv
 stop_name,lat,lng,zone,is_hub
-State Bank,12.8698,74.8426,City Centre,TRUE
-Lalbagh,12.8713,74.8397,City Centre,FALSE
+Bus Stand,12.8698,74.8426,City Centre,TRUE
+Balmatta,12.8713,74.8397,City Centre,FALSE
 ```
+
+See [data/README.md](data/README.md) for detailed formats.
+
+## 🔌 API Endpoints
+
+All endpoints return JSON. See [Backend README](Neo4j/backend/README.md) for full documentation.
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/stops` | GET | Search stops |
+| `/api/routes` | GET | List/search routes |
+| `/api/direct-routes` | GET | Single-bus connections |
+| `/api/paths` | GET | Optimal multi-route paths |
+
+### Example: Find Route Between Stops
+
+```bash
+curl "http://localhost:5000/api/paths?from_id=stop_123&to_id=stop_456&weight_field=weight_distance"
+```
+
+Response:
+```json
+[
+  {
+    "path": [
+      {"id": "stop_123", "name": "Bus Stand", "lat": 12.8698, "lng": 74.8426},
+      {"id": "stop_456", "name": "Balmatta", "lat": 12.8713, "lng": 74.8397}
+    ],
+    "route_segments": [{"route_no": "1", "from_stop": "Bus Stand", "to_stop": "Balmatta"}],
+    "total_distance_km": 0.5,
+    "total_time_min": 2.0
+  }
+]
+```
+
+## 🔒 Security & Privacy
+
+✅ **No Hardcoded Secrets** - All credentials use environment variables
+✅ **Configuration Management** - `.env.local` template with examples
+✅ **.gitignore Configured** - Prevents accidental secret leaks
+✅ **Public Data Only** - No personal information stored
+✅ **CI/CD Checks** - GitHub Actions verify no secrets are committed
+
+### Safe for Public GitHub
+- Environment variables in `.env.local` (git-ignored)
+- Example config in `.env.example`
+- No API keys or passwords in code
+- Automated security scanning
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#security-guidelines) for security best practices.
+
+## 🛠️ Tech Stack
+
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| Database | Neo4j | 4.x - 5.x |
+| Backend | Flask | 2.3+ |
+| Backend | Python | 3.8+ |
+| Frontend | Leaflet.js | 1.9+ |
+| Maps | OpenStreetMap | Latest |
+| API | REST | JSON |
+
+## 📊 Project Structure
+
+```
+mangaluru-bus/
+├── README.md                    # This file
+├── LICENSE                      # MIT License
+├── DEVELOPMENT.md               # Development setup guide
+├── CONTRIBUTING.md              # Contribution guidelines
+├── requirements.txt             # Python dependencies
+├── config.py                    # Shared configuration
+├── .env.example                 # Environment variable template
+├── .gitignore                   # Git ignore rules
+│
+├── data/                        # Data enrichment
+│   ├── README.md
+│   ├── stops.csv                # Stop coordinates & metadata
+│   └── stop_distances.csv       # Optional distance data
+│
+├── dataset/                     # Data processing pipeline
+│   ├── README.md
+│   ├── csv_graph_data.py        # CSV → Graph transformation
+│   ├── load_graph.py            # Graph → Neo4j loader
+│   ├── load_simple.py           # Alternative loader
+│   └── csv/
+│       ├── bus-data.csv         # Route data
+│       └── bus-data-old.csv     # Previous version
+│
+├── Neo4j/backend/               # Flask API server
+│   ├── README.md
+│   └── app.py                   # Flask application
+│
+├── frontend/                    # Web UI
+│   ├── README.md
+│   └── templates/
+│       └── index.html           # Interactive map
+│
+└── .github/workflows/           # CI/CD
+    └── security-check.yml       # Automated checks
+```
+
+## 🔄 How It Works
+
+### 1. Data Pipeline
+```
+CSV Files → Parse → Normalize → Calculate Distances → Build Graph
+```
+
+### 2. Graph Loading
+```
+Graph Data → Neo4j Driver → Create Nodes → Create Relationships
+```
+
+### 3. API Workflow
+```
+User Request → Flask Route → Run Cypher Query → Return JSON
+```
+
+### 4. Frontend Flow
+```
+Map Loaded → User Searches → Fetch API → Display Results
+```
+
+## 📖 Examples
+
+### Search for a Stop
+
+```python
+import requests
+
+response = requests.get('http://localhost:5000/api/stops?q=balmatta')
+stops = response.json()
+for stop in stops:
+    print(f"{stop['name']} ({stop['id']})")
+```
+
+### Find Optimal Route
+
+```python
+response = requests.get(
+    'http://localhost:5000/api/paths',
+    params={
+        'from_id': 'stop_1',
+        'to_id': 'stop_42',
+        'weight_field': 'weight_distance'
+    }
+)
+paths = response.json()
+best_path = paths[0]  # Shortest by distance
+print(f"Route: {' → '.join([s['name'] for s in best_path['path']])}")
+```
+
+### Query Directly in Neo4j
+
+```cypher
+// Find all routes through a specific stop
+MATCH (r:Route)-[:SERVES]->(s:BusStop {name: 'Bus Stand'})
+RETURN r.route_no, r.name, r.stops
+LIMIT 5
+```
+
+## 🎯 Future Enhancements
+
+- [ ] Real-time bus tracking
+- [ ] Estimated arrival times  
+- [ ] Fare calculation
+- [ ] Accessibility information
+- [ ] Trip planning with alerts
+- [ ] Mobile app (React Native)
+- [ ] Crowding prediction
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**"Connection refused" from Neo4j**
+- Check Neo4j is running: `neo4j status`
+- Verify credentials in `.env.local`
+- Check port 7687 is accessible
+
+**Map not loading**
+- Clear browser cache (Ctrl+Shift+Delete)
+- Check Flask backend is running
+- Open browser console (F12) for errors
+
+**No stops appearing**
+- Verify data loaded: `python dataset/load_graph.py`
+- Check stops in Neo4j Browser: `MATCH (s:BusStop) RETURN COUNT(s)`
+
+For more help, see [DEVELOPMENT.md](DEVELOPMENT.md#troubleshooting).
+
+## 🤝 Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+Quick checklist:
+- [ ] Fork the repository
+- [ ] Create feature branch (`git checkout -b feature/my-feature`)
+- [ ] Make changes and test locally
+- [ ] Ensure no `.env.local` secrets are committed
+- [ ] Submit pull request with clear description
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE) - see LICENSE file for details.
+
+## 👥 Contributors
+
+<!-- Add your name here when contributing -->
+- Project created as a Sem 6 Big Data project
+
+## 📞 Support
+
+- 📖 [Read the docs](DEVELOPMENT.md)
+- 🐛 [Report issues](https://github.com/yourusername/mangaluru-bus/issues)
+- 💬 [Discussions](https://github.com/yourusername/mangaluru-bus/discussions)
+
+## 🎓 Educational Value
+
+This project demonstrates:
+
+- **Graph Databases** - Neo4j concepts and Cypher queries
+- **Backend Development** - Flask REST APIs
+- **Data Processing** - CSV parsing and transformation
+- **Frontend Skills** - Leaflet.js and interactive maps
+- **Algorithm** - Dijkstra's pathfinding
+- **Full Stack** - End-to-end development
+
+Perfect for learning Big Data and graph technologies!
+
+---
+
+**Note:** Replace `yourusername` in URLs with your actual GitHub username before pushing.
+
+Made with ❤️ for Mangaluru's transit community
 
 ### `stop_distances.csv`
 
@@ -147,25 +442,40 @@ Examples:
 pip install flask flask-cors neo4j
 ```
 
-### 2. Start Neo4j
+### 2. Create local config
+
+Copy the example config and create a local-only file:
+
+```bash
+copy .env.example .env.local
+```
+
+Then edit `.env.local` and add your actual Neo4j password.
+
+Example:
+
+```text
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_password_here
+```
+
+Important:
+
+- `.env.local` is ignored by git
+- never commit your real password
+- `.env.example` is safe to publish because it contains placeholders only
+
+### 3. Start Neo4j
 
 Make sure Neo4j Desktop is running and your database instance is started.
 
-The default connection used in the code is:
+The project reads Neo4j connection details from:
 
-```text
-bolt://localhost:7687
-username: neo4j
-password: set via environment variable
-```
+- environment variables, or
+- `.env.local` at the project root
 
-Set credentials before running the loader or backend:
-
-```bash
-set NEO4J_URI=bolt://localhost:7687
-set NEO4J_USER=neo4j
-set NEO4J_PASSWORD=your_password_here
-```
+If both exist, environment variables take priority.
 
 ## Load the Graph Data
 
@@ -249,6 +559,23 @@ Because of that, the graph logic can still work, but map accuracy depends heavil
 
 ## Troubleshooting
 
+### App does not connect to Neo4j
+
+Check that:
+
+- Neo4j Desktop is running
+- the database instance is started
+- `.env.local` contains the correct password
+- the connection URI matches your local Neo4j instance
+
+Sample `.env.local`:
+
+```text
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_password_here
+```
+
 ### Constraint error on `Route.route_no`
 
 If Neo4j throws an error about duplicate `route_no`, it means an older uniqueness constraint still exists.
@@ -271,16 +598,6 @@ Then reload the graph with:
 ```bash
 python load_graph.py
 ```
-
-### Import error for `mangaluru_bus_data`
-
-If VS Code reports:
-
-```text
-Import "mangaluru_bus_data" could not be resolved
-```
-
-make sure you are opening and running the current project files, not older copies from another directory such as `Downloads`.
 
 ## Summary
 
